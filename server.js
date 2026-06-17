@@ -51,20 +51,17 @@ async function runGrokWebSearch(query) {
     throw new Error("XAI_API_KEY is not set.");
   }
 
-  const response = await fetch("https://api.x.ai/v1/chat/completions", {
+  const response = await fetch("https://api.x.ai/v1/responses", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${xaiApiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "grok-4",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a research assistant. Use live web search when helpful. Return a concise answer with useful source links where available.",
-        },
+      model: "grok-4.3",
+      instructions:
+        "You are a research assistant. Use live web search when helpful. Return a concise answer with useful source links where available.",
+      input: [
         {
           role: "user",
           content: query,
@@ -78,15 +75,29 @@ async function runGrokWebSearch(query) {
     }),
   });
 
-  const data = await response.json();
+  const rawText = await response.text();
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch (e) {
+    throw new Error(`xAI API returned non-JSON: ${rawText.slice(0, 300)}`);
+  }
 
   if (!response.ok) {
     throw new Error(JSON.stringify(data));
   }
 
+  const answer =
+    data.output
+      ?.flatMap((o) => o.content || [])
+      ?.filter((c) => c.type === "output_text")
+      ?.map((c) => c.text)
+      ?.join("") || "";
+
   return {
     provider: "grok",
-    answer: data?.choices?.[0]?.message?.content || "",
+    answer,
+    citations: data.citations || [],
     raw: data,
   };
 }
@@ -96,20 +107,17 @@ async function runGrokXSearch(query) {
     throw new Error("XAI_API_KEY is not set.");
   }
 
-  const response = await fetch("https://api.x.ai/v1/chat/completions", {
+  const response = await fetch("https://api.x.ai/v1/responses", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${xaiApiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "grok-4",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a social media intelligence assistant. Use X search to find current posts, sentiment, angles, competitors, objections, and trend language. Return concise insights with links where available.",
-        },
+      model: "grok-4.3",
+      instructions:
+        "You are a social media intelligence assistant. Use X search to find current posts, sentiment, angles, competitors, objections, and trend language. Return concise insights with links where available.",
+      input: [
         {
           role: "user",
           content: query,
@@ -123,15 +131,29 @@ async function runGrokXSearch(query) {
     }),
   });
 
-  const data = await response.json();
+  const rawText = await response.text();
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch (e) {
+    throw new Error(`xAI API returned non-JSON: ${rawText.slice(0, 300)}`);
+  }
 
   if (!response.ok) {
     throw new Error(JSON.stringify(data));
   }
 
+  const answer =
+    data.output
+      ?.flatMap((o) => o.content || [])
+      ?.filter((c) => c.type === "output_text")
+      ?.map((c) => c.text)
+      ?.join("") || "";
+
   return {
     provider: "grok_x",
-    answer: data?.choices?.[0]?.message?.content || "",
+    answer,
+    citations: data.citations || [],
     raw: data,
   };
 }
